@@ -1,38 +1,60 @@
-// __attribute__((aligned(16))) char stack0[4096];
-
-// @export(stack, .{.name = "stack"});
 export var stack0: [4096]u8 = .{0} ** 4096;
-// unsigned char *uart = (unsigned char *)0x10000000; 
-const UART: usize = 0x10000000;
-var uartPtr: *volatile u8 = @ptrFromInt(UART);
+const uart = @import("uart.zig");
 
-fn putchar(c: u8) void {
-    uartPtr.* = c;
+fn putChar(c: u8) void {
+    uart.writeReg(uart.UART, c);
 }
-// void putchar(char c) {
-// 	*uart = c;
-// 	return;
-// }
- 
+
+fn getCharNoBlock() ?u8 {
+    if (uart.readReg(uart.UART + uart.UART_LSR_OFFSET) & uart.UART_LSR_DR == 1) {
+        return uart.readReg(uart.UART + uart.UART_RBR_OFFSET);
+    } else {
+        return null;
+    }    
+} 
+
+fn getChar() u8 {
+    while(true){
+        if(getCharNoBlock()) |c| {
+            putChar(c);
+            return c;
+        }
+    }
+} 
+
 fn print(str: []const u8) void {
     for (str) |c| {
-        putchar(c);
+        if(c == 0){
+            break;
+        }
+        putChar(c);
     }
-
 }
-// void print(const char * str) {
-// 	while(*str != '\0') {
-// 		// putchar(*str);
-//         uartputc(*str);
-// 		str++;
-// 	}
-// 	return;
-// }
+
+fn getStr(buf: [] u8, max_size: u8) void{
+    var i: u8 = 0;
+    while (i < max_size) : (i += 1) {
+        const c = getChar();
+        
+        if((c == '\n') or (c == '\r')){
+            buf[i] = 0;
+            return;
+        }
+
+        buf[i] = c;
+    }
+}
 
 export fn start() void {
-    const str1 = "Hellow World 2!!!\n";
+    uart.init();
+
+    var input: [80]u8 = undefined;
+    const str1 = "CMD > ";
     // print("Hellow World!!!\n");
     print(str1);
+    getStr(&input, 80);
+    print("\n");
+    print(&input);
     while(true){
         // asm volatile("add x0, x0, 0");
     }
