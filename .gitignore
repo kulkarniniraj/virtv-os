@@ -1,4 +1,7 @@
 kernel*
 .zig-cache/*
 qemu*
-*.map
+*.map*
+a.dts
+gdbinit
+main.s
