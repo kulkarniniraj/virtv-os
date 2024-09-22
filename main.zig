@@ -1,5 +1,7 @@
 export var stack0: [4096]u8 = .{0} ** 4096;
 const uart = @import("uart.zig");
+const hw = @import("hwaccess.zig");
+var timer_cnt: u32 = 0;
 
 fn putChar(c: u8) void {
     uart.writeReg(uart.UART, c);
@@ -77,6 +79,32 @@ fn printUInt(x: u64) void {
     }
 }
 
+fn printUIntHex(x: u64) void {
+    var x2 = x;
+    var digits: [40]u8 = .{0}**40;
+    var digit_cnt: u8 = 0;
+    const lookup: [16]u8 = .{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'A', 'B', 'C', 'D', 'E', 'F'};
+    
+    while (true){
+        digits[digit_cnt] = @intCast(@rem(x2, 16));
+        digit_cnt += 1;
+        x2 = @divFloor(x2, 16);
+        if (x2 == 0){
+            break;
+        }
+    }
+    digit_cnt -= 1;
+
+    while (true) : (digit_cnt -= 1){
+        putChar(lookup[digits[digit_cnt]]);
+
+        if(digit_cnt == 0){
+            break;
+        }
+    }
+}
+
 fn print(str: []const u8) void {
     for (str) |c| {
         if(c == 0){
@@ -113,15 +141,25 @@ fn delayTimer() void {
     asm volatile("rdtime %[ret]" : [ret] "=r" (prev):: );
     while(true){
         asm volatile("rdtime %[ret]" : [ret] "=r" (time):: );
-        if(time - prev > 1000*1000*10){
+        if(time - prev > (1000*1000*9 + 1000 * 999 + 600)){
             break;
         }
     }
 
 }
 
-export fn ISR() align(4) callconv(.Naked) void {
-    
+export fn ISR() align(4) callconv(.C) void {
+    // print("in ISR\n");
+    const val = hw.read_mcause() & 0xFFFF;
+    if (val == 7 ){
+        print("machine timer interrupt: ");
+        printInt(timer_cnt);
+        print("\n");
+        timer_cnt += 1;
+        hw.write_mtimecmp(hw.read_mtime() + 0x1000000);
+    }
+
+    asm volatile("mret");
 }
 
 export fn start() void {
@@ -134,44 +172,41 @@ export fn start() void {
     print(str1);
     // getStr(&input, 80);
     print("\n");
-    // print(&input);
-    // printInt(1234);
-    // print("\nUint\n");
-    // printUInt(12345);
+    
+    const mie = hw.read_mie();
+    print("MIE\n");
+    printUInt(mie);
 
-    // asm volatile("rdtime %[ret]" : [ret] "=r" (time):: );
-    // print("\nTime\n");
-    // printUInt(time);
+    // var i: u8 = 0;
+    // while(i < 50) : (i += 1) {
+    //     delayTimer();
+    //     printInt(i);
+    //     print(" -> ");
+    // }
+    print("MIP\n");
+    printUIntHex(hw.read_mtime());
+    print("\n");
 
-    // delay();
+    hw.write_mstatus(hw.read_mstatus() | ( 1 << hw.MIE_BIT));
+    hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT));
+    hw.write_mtvec(@intFromPtr(&ISR));
+    hw.write_mtimecmp(hw.read_mtime() + 0x10000);
 
-    // asm volatile("rdtime %[ret]" : [ret] "=r" (time):: );
-    // print("\nTime\n");
-    // printUInt(time);
+    delayTimer();
+    print("MIP\n");
+    printUIntHex(hw.read_mtime());
+    print("\n");
 
-    // delay();
-
-    // asm volatile("rdtime %[ret]" : [ret] "=r" (time):: );
-    // print("\nTime\n");
-    // printUInt(time);
-
-    // delay();
-
-    // asm volatile("rdtime %[ret]" : [ret] "=r" (time):: );
-    // print("\nTime\n");
-    // printUInt(time);
-
-    // delay();
-
-    var i: u8 = 0;
-    while(i < 50) : (i += 1) {
-        delayTimer();
-        printInt(i);
-        print(" -> ");
-    }
+    // print("MTIME\n");
+    // var i: u8 = 0;
+    // while(i < 10) : (i += 1) {
+    //     delayTimer();
+    //     printUInt(hw.read_mtime());
+    //     print(" -> ");
+    // }
 
     while(true){
-        // asm volatile("add x0, x0, 0");
+        asm volatile("add x0, x0, 0");
     }
 
 }
