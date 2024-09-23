@@ -1,9 +1,12 @@
-export var stack0: [4096]u8 = .{0} ** 4096;
+export var stack0: [4096*10]u8 = .{0} ** (4096*10);
+
+
 const uart = @import("uart.zig");
 const hw = @import("hwaccess.zig");
+const process = @import("process.zig");
 var timer_cnt: u32 = 0;
 
-fn putChar(c: u8) void {
+export fn putChar(c: u8) void {
     uart.writeReg(uart.UART, c);
 }
 
@@ -156,6 +159,23 @@ export fn ISR() align(4) callconv(.C) void {
         printInt(timer_cnt);
         print("\n");
         timer_cnt += 1;
+        if (@rem(timer_cnt, 3) == 0){
+            print("switching ctx\n");
+            print("MEPC before\n");
+            printUIntHex(hw.read_mepc());
+            print("\n");
+            
+            // var sp: u64 = undefined;
+            // asm volatile("mv %[ret], sp" : [ret] "=r" (sp):: );
+            // print("SP before\n");
+            // printUIntHex(sp);
+            // print("\n");
+
+            // process.switch_ctx();
+            print("MEPC after\n");
+            // printUIntHex(hw.read_mepc());
+            // print("\n");
+        }
         hw.write_mtimecmp(hw.read_mtime() + 0x1000000);
     }
 
@@ -187,10 +207,10 @@ export fn start() void {
     printUIntHex(hw.read_mtime());
     print("\n");
 
-    hw.write_mstatus(hw.read_mstatus() | ( 1 << hw.MIE_BIT));
-    hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT));
-    hw.write_mtvec(@intFromPtr(&ISR));
-    hw.write_mtimecmp(hw.read_mtime() + 0x10000);
+    // hw.write_mstatus(hw.read_mstatus() | ( 1 << hw.MIE_BIT));
+    // hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT));
+    // hw.write_mtvec(@intFromPtr(&ISR));
+    // hw.write_mtimecmp(hw.read_mtime() + 0x10000);
 
     delayTimer();
     print("MIP\n");
@@ -205,8 +225,53 @@ export fn start() void {
     //     print(" -> ");
     // }
 
-    while(true){
-        asm volatile("add x0, x0, 0");
-    }
+    // while(true){
+    //     asm volatile("add x0, x0, 0");
+    // }
+    process.createProcess(&process1);    
+    process.createProcess(&process2);
+    process.createProcess(&process3);
+    process.switch_ctx();
+    // process1();
+}
 
+pub fn process1() void {
+    // var sp: u64 = undefined;
+    // asm volatile("mv %[ret], sp" : [ret] "=r" (sp):: );
+    // print("SP before\n");
+    // printUIntHex(sp);
+    // print("\n");
+
+    while(true){
+        var i: u8 = 0;
+        while(i < 10) : (i += 1) {
+            delayTimer();
+            print("in process 1\n");
+        }
+        process.switch_ctx();
+    }
+    
+    
+}
+
+pub fn process2() void {
+    while(true){
+        var i: u8 = 0;
+        while(i < 5) : (i += 1) {
+            delayTimer();
+            print("in process 2\n");
+        }
+        process.switch_ctx();
+    }
+}
+
+pub fn process3() void {
+    while(true){
+        var i: u8 = 0;
+        while(i < 2) : (i += 1) {
+            delayTimer();
+            print("in process 3\n");
+        }
+        process.switch_ctx();
+    }
 }

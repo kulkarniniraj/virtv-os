@@ -58,6 +58,16 @@ pub fn read_mcause() u64 {
     return val;
 }
 
+pub fn read_mepc() u64 {
+    var val: u64 = 0;
+    asm volatile("csrr %[ret], mepc" : [ret] "=r" (val):: );
+    return val;
+}
+
+pub fn write_mepc(val: u64) void {
+    asm volatile("csrw mepc, %[val]" :  : [val] "r" (val): );
+}
+
 pub fn read_mtime() u64 {
     return readReg(u64, CLINT_BASE + CLINT_MTIME_OFFSET);
 }
