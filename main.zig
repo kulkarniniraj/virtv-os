@@ -4,131 +4,13 @@ export var stack0: [4096*10]u8 = .{0} ** (4096*10);
 const uart = @import("uart.zig");
 const hw = @import("hwaccess.zig");
 const process = @import("process.zig");
+const string = @import("string.zig");
+const stdio = @import("stdio.zig");
+
 var timer_cnt: u32 = 0;
 
 export fn putChar(c: u8) void {
     uart.writeReg(uart.UART, c);
-}
-
-fn getCharNoBlock() ?u8 {
-    if (uart.readReg(uart.UART + uart.UART_LSR_OFFSET) & uart.UART_LSR_DR == 1) {
-        return uart.readReg(uart.UART + uart.UART_RBR_OFFSET);
-    } else {
-        return null;
-    }    
-} 
-
-fn getChar() u8 {
-    while(true){
-        if(getCharNoBlock()) |c| {
-            putChar(c);
-            return c;
-        }
-    }
-} 
-
-fn printInt(x: i64) void {
-    var x2 = x;
-    var digits: [40]u8 = .{0}**40;
-    var digit_cnt: u8 = 0;
-    if(x < 0){
-        putChar('-');
-        x2 = -x;
-    }
-    else if (x == 0){
-        putChar('0');
-        return;
-    }
-
-    while (true){
-        digits[digit_cnt] = @intCast(@rem(x2, 10));
-        digit_cnt += 1;
-        x2 = @divFloor(x2, 10);
-        if (x2 == 0){
-            break;
-        }
-    }
-    digit_cnt -= 1;
-
-    while (true) : (digit_cnt -= 1){
-        putChar(@intCast('0' + digits[digit_cnt]));
-        if(digit_cnt == 0){
-            break;
-        }
-    }
-}
-
-fn printUInt(x: u64) void {
-    var x2 = x;
-    var digits: [40]u8 = .{0}**40;
-    var digit_cnt: u8 = 0;
-    
-    while (true){
-        digits[digit_cnt] = @intCast(@rem(x2, 10));
-        digit_cnt += 1;
-        x2 = @divFloor(x2, 10);
-        if (x2 == 0){
-            break;
-        }
-    }
-    digit_cnt -= 1;
-
-    while (true) : (digit_cnt -= 1){
-        putChar(@intCast('0' + digits[digit_cnt]));
-
-        if(digit_cnt == 0){
-            break;
-        }
-    }
-}
-
-fn printUIntHex(x: u64) void {
-    var x2 = x;
-    var digits: [40]u8 = .{0}**40;
-    var digit_cnt: u8 = 0;
-    const lookup: [16]u8 = .{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    'A', 'B', 'C', 'D', 'E', 'F'};
-    
-    while (true){
-        digits[digit_cnt] = @intCast(@rem(x2, 16));
-        digit_cnt += 1;
-        x2 = @divFloor(x2, 16);
-        if (x2 == 0){
-            break;
-        }
-    }
-    digit_cnt -= 1;
-
-    while (true) : (digit_cnt -= 1){
-        putChar(lookup[digits[digit_cnt]]);
-
-        if(digit_cnt == 0){
-            break;
-        }
-    }
-}
-
-fn print(str: []const u8) void {
-    for (str) |c| {
-        if(c == 0){
-            break;
-        }
-        putChar(c);
-    }
-}
-
-fn getStr(buf: [] u8, max_size: u8) void{
-    var i: u8 = 0;
-    while (i < max_size) : (i += 1) {
-        const c = getChar();
-        
-        if((c == '\n') or (c == '\r')){
-            buf[i] = 0;
-            return;
-        }
-
-        buf[i] = c;
-    }
 }
 
 fn delay() void {
@@ -177,26 +59,26 @@ export fn ISR() align(4) callconv(.C) void {
         );
     const val = hw.read_mcause() & 0xFFFF;
     if (val == 7 ){
-        print("machine timer interrupt: ");
-        printInt(timer_cnt);
-        print("\n");
+        stdio.print("machine timer interrupt: ");
+        stdio.printInt(timer_cnt);
+        stdio.print("\n");
         timer_cnt += 1;
         if (@rem(timer_cnt, 3) == 0){
-            print("switching ctx\n");
-            print("MEPC before\n");
-            printUIntHex(hw.read_mepc());
-            print("\n");
+            // stdio.print("switching ctx\n");
+            // stdio.print("MEPC before\n");
+            // stdio.printUIntHex(hw.read_mepc());
+            // stdio.print("\n");
             
-            // var sp: u64 = undefined;
-            // asm volatile("mv %[ret], sp" : [ret] "=r" (sp):: );
-            // print("SP before\n");
-            // printUIntHex(sp);
-            // print("\n");
+            // var mysp: u64 = 0;
+            // asm volatile("mv %[ret], sp" : [ret] "=r" (mysp):: );
+            // stdio.print("SP before\n");
+            // stdio.printUIntHex(sp);
+            // stdio.print("\n");
 
             // process.switch_ctx();
-            print("MEPC after\n");
-            // printUIntHex(hw.read_mepc());
-            // print("\n");
+            stdio.print("MEPC after\n");
+            // stdio.printUIntHex(hw.read_mepc());
+            // stdio.print("\n");
         }
         hw.write_mtimecmp(hw.read_mtime() + 0x1000000);
     }
@@ -239,24 +121,17 @@ export fn start() void {
 
     // var input: [80]u8 = undefined;
     const str1 = "CMD > ";
-    // print("Hellow World!!!\n");
-    print(str1);
+    stdio.print(str1);
     // getStr(&input, 80);
-    print("\n");
+    stdio.print("\n");
     
     const mie = hw.read_mie();
-    print("MIE\n");
-    printUInt(mie);
+    stdio.print("MIE\n");
+    stdio.printUInt(mie);
 
-    // var i: u8 = 0;
-    // while(i < 50) : (i += 1) {
-    //     delayTimer();
-    //     printInt(i);
-    //     print(" -> ");
-    // }
-    print("MIP\n");
-    printUIntHex(hw.read_mtime());
-    print("\n");
+    stdio.print("MIP\n");
+    stdio.printUIntHex(hw.read_mtime());
+    stdio.print("\n");
 
     // hw.write_mstatus(hw.read_mstatus() | ( 1 << hw.MIE_BIT));
     // hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT));
@@ -264,41 +139,43 @@ export fn start() void {
     // hw.write_mtimecmp(hw.read_mtime() + 0x10000);
 
     delayTimer();
-    print("MIP\n");
-    printUIntHex(hw.read_mtime());
-    print("\n");
+    stdio.print("MIP\n");
+    stdio.printUIntHex(hw.read_mtime());
+    stdio.print("\n");
 
-    // print("MTIME\n");
+    // stdio.print("MTIME\n");
     // var i: u8 = 0;
     // while(i < 10) : (i += 1) {
     //     delayTimer();
-    //     printUInt(hw.read_mtime());
-    //     print(" -> ");
+    //     stdio.printUInt(hw.read_mtime());
+    //     stdio.print(" -> ");
     // }
+
 
     var a: [50]u8 = undefined;
     const b = string.concat(&[_][]const u8 {"first ", "second\n"}, &a) catch 0;
-    print(a[0..b]);
+    stdio.print(a[0..b]);
 
     process.createProcess(&process1);    
     process.createProcess(&process2);
     process.createProcess(&process3);
-    process.switch_ctx();
-    // process1();
+    process.switch_ctx();    
 }
 
 pub fn process1() void {
     // var sp: u64 = undefined;
     // asm volatile("mv %[ret], sp" : [ret] "=r" (sp):: );
-    // print("SP before\n");
-    // printUIntHex(sp);
-    // print("\n");
+    // stdio.print("SP before\n");
+    // stdio.printUIntHex(sp);
+    // stdio.print("\n");
 
     while(true){
         var i: u8 = 0;
         while(i < 10) : (i += 1) {
             delayTimer();
-            print("in process 1\n");
+            stdio.print("in process 1: ");
+            stdio.printInt(i);
+            stdio.print("\n");
         }
         process.switch_ctx();
     }
@@ -311,7 +188,7 @@ pub fn process2() void {
         var i: u8 = 0;
         while(i < 5) : (i += 1) {
             delayTimer();
-            print("in process 2\n");
+            stdio.print("in process 2\n");
         }
         process.switch_ctx();
     }
@@ -322,7 +199,7 @@ pub fn process3() void {
         var i: u8 = 0;
         while(i < 2) : (i += 1) {
             delayTimer();
-            print("in process 3\n");
+            stdio.print("in process 3\n");
         }
         process.switch_ctx();
     }
