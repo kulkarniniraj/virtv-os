@@ -276,9 +276,10 @@ export fn start() void {
     //     print(" -> ");
     // }
 
-    // while(true){
-    //     asm volatile("add x0, x0, 0");
-    // }
+    var a: [50]u8 = undefined;
+    const b = string.concat(&[_][]const u8 {"first ", "second\n"}, &a) catch 0;
+    print(a[0..b]);
+
     process.createProcess(&process1);    
     process.createProcess(&process2);
     process.createProcess(&process3);
