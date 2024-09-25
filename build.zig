@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) anyerror!void {
 
     kernel.setLinkerScriptPath(b.path("link.ld"));
     kernel.addAssemblyFile(b.path("entry.S"));
+    kernel.addAssemblyFile(b.path("isr.S"));
     kernel.entry = .{.symbol_name = "_entry"};
     b.installArtifact(kernel);
 

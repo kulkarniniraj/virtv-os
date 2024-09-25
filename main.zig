@@ -6,6 +6,7 @@ const hw = @import("hwaccess.zig");
 const process = @import("process.zig");
 const string = @import("string.zig");
 const stdio = @import("stdio.zig");
+extern var _isr: u64;
 
 var timer_cnt: u32 = 0;
 
@@ -33,31 +34,37 @@ fn delayTimer() void {
 
 }
 
+// export fn ISR() align(4) callconv(.C) void {
 export fn ISR() align(4) callconv(.C) void {
-    // save pre ISR context    
-    asm volatile(
-        \\ addi sp, sp, -256
-        \\ sd ra, 0(sp)
-        \\ sd sp, 8(sp)
-        \\ sd gp, 16(sp)
-        \\ sd tp, 24(sp)
-        \\ sd t0, 32(sp)
-        \\ sd t1, 40(sp)
-        \\ sd t2, 48(sp)
-        \\ sd a0, 72(sp)
-        \\ sd a1, 80(sp)
-        \\ sd a2, 88(sp)
-        \\ sd a3, 96(sp)
-        \\ sd a4, 104(sp)
-        \\ sd a5, 112(sp)
-        \\ sd a6, 120(sp)
-        \\ sd a7, 128(sp)
-        \\ sd t3, 216(sp)
-        \\ sd t4, 224(sp)
-        \\ sd t5, 232(sp)
-        \\ sd t6, 240(sp)
-        );
-    const val = hw.read_mcause() & 0xFFFF;
+    
+    
+    var val = hw.read_mcause();
+
+    const itype = val & 0x8000000000000000;
+
+    if(itype != 0) {
+        stdio.print("interrupt\n");
+    }
+    else {
+        stdio.print("exception ");
+        stdio.printUIntHex(val);
+        stdio.print("\nmepc: ");
+        stdio.printUIntHex(hw.read_mepc());
+        stdio.print("\n");
+        
+    }
+    
+    val &= 0xFFFF;
+
+    // if (val != 1){
+    if(true){
+        stdio.print("mcause register: ");
+        stdio.printUIntHex(val);
+        stdio.print("\n");
+    }
+    
+
+    
     if (val == 7 ){
         stdio.print("machine timer interrupt: ");
         stdio.printInt(timer_cnt);
@@ -81,38 +88,11 @@ export fn ISR() align(4) callconv(.C) void {
             // stdio.print("\n");
         }
         hw.write_mtimecmp(hw.read_mtime() + 0x1000000);
+    }else if (val == 9){
+        stdio.print("disk interrup detected\n");
     }
 
-    // restore pre ISR context    
-    asm volatile(
-        \\ ld ra, 0(sp)
-        \\ ld sp, 8(sp)
-        \\ ld gp, 16(sp)
-        \\ # not tp (contains hartid), in case we moved CPUs
-        \\ ld t0, 32(sp)
-        \\ ld t1, 40(sp)
-        \\ ld t2, 48(sp)
-        \\ ld a0, 72(sp)
-        \\ ld a1, 80(sp)
-        \\ ld a2, 88(sp)
-        \\ ld a3, 96(sp)
-        \\ ld a4, 104(sp)
-        \\ ld a5, 112(sp)
-        \\ ld a6, 120(sp)
-        \\ ld a7, 128(sp)
-        \\ ld t3, 216(sp)
-        \\ ld t4, 224(sp)
-        \\ ld t5, 232(sp)
-        \\ ld t6, 240(sp)
-        \\ addi sp, sp, 256
-        \\ # post mret restoration should be included
-        \\ ld      ra,40(sp)
-        \\ ld      s0,32(sp)
-        \\ addi    sp,sp,48
-
-        );
-
-    asm volatile("mret");
+    
 }
 
 export fn start() void {
@@ -133,10 +113,12 @@ export fn start() void {
     stdio.printUIntHex(hw.read_mtime());
     stdio.print("\n");
 
-    // hw.write_mstatus(hw.read_mstatus() | ( 1 << hw.MIE_BIT));
-    // hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT));
+    hw.write_mstatus(hw.read_mstatus() | ( 1 << hw.MIE_BIT));
+    // hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT) | (1 << hw.MSIE_BIT) | (1 << hw.MEIE_BIT));
+    hw.write_mie(hw.read_mie() | ( 1 << hw.MTIE_BIT));
+    hw.write_mtvec(@intFromPtr(&_isr));
     // hw.write_mtvec(@intFromPtr(&ISR));
-    // hw.write_mtimecmp(hw.read_mtime() + 0x10000);
+    hw.write_mtimecmp(hw.read_mtime() + 0x10000);
 
     delayTimer();
     stdio.print("MIP\n");
