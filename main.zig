@@ -6,6 +6,8 @@ const hw = @import("hwaccess.zig");
 const process = @import("process.zig");
 const string = @import("string.zig");
 const stdio = @import("stdio.zig");
+const disk = @import("disk.zig");
+
 extern var _isr: u64;
 
 var timer_cnt: u32 = 0;
@@ -83,10 +85,10 @@ export fn ISR() align(4) callconv(.C) void {
             // stdio.print("\n");
 
             // process.switch_ctx();
-            stdio.print("MEPC after\n");
+            // stdio.print("MEPC after\n");
             // stdio.printUIntHex(hw.read_mepc());
             // stdio.print("\n");
-        }
+        }        
         hw.write_mtimecmp(hw.read_mtime() + 0x1000000);
     }else if (val == 9){
         stdio.print("disk interrup detected\n");
@@ -133,6 +135,10 @@ export fn start() void {
     //     stdio.print(" -> ");
     // }
 
+    disk.init();
+    disk.read_block();
+    delayTimer();
+    disk.check_status();
 
     var a: [50]u8 = undefined;
     const b = string.concat(&[_][]const u8 {"first ", "second\n"}, &a) catch 0;

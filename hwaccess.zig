@@ -3,7 +3,11 @@ const MIE = packed struct {
 };
 
 pub const MIE_BIT = 3;
+
+pub const MSIE_BIT = 3;
 pub const MTIE_BIT = 7;
+pub const MEIE_BIT = 11;
+
 pub const CLINT_BASE = 0x2000000 + 0x4000;
 pub const CLINT_MTIMECMP_OFFSET	= 0x0000;
 pub const CLINT_MTIME_OFFSET = 0x7ff8;
