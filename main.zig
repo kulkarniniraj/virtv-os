@@ -1,5 +1,6 @@
 export var stack0: [4096*10]u8 = .{0} ** (4096*10);
 
+const std = @import("std");
 
 const uart = @import("uart.zig");
 const hw = @import("hwaccess.zig");
@@ -11,6 +12,14 @@ const disk = @import("disk.zig");
 extern var _isr: u64;
 
 var timer_cnt: u32 = 0;
+
+const KERNEL_MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+const RISCV_MEM_START = 0x80_00_00_00;
+const MEM_START = RISCV_MEM_START + KERNEL_MAX_SIZE;
+const MEM_END = RISCV_MEM_START + 128 * 1024 * 1024;
+const MEM_SIZE = MEM_END - MEM_START;
+
+var kernel_allocator: std.mem.Allocator = undefined; 
 
 export fn putChar(c: u8) void {
     uart.writeReg(uart.UART, c);
@@ -98,6 +107,10 @@ export fn ISR() align(4) callconv(.C) void {
 }
 
 export fn start() void {
+    const mem: [*]u8 = @ptrFromInt(MEM_START);
+    var alloc = std.heap.FixedBufferAllocator.init(mem[0..MEM_SIZE]);
+    kernel_allocator = alloc.allocator();
+
     // var time: u64 = 0;
     uart.init();
 
@@ -156,14 +169,15 @@ pub fn process1() void {
     // stdio.print("SP before\n");
     // stdio.printUIntHex(sp);
     // stdio.print("\n");
-
+    
     while(true){
         var i: u8 = 0;
         while(i < 10) : (i += 1) {
             delayTimer();
-            stdio.print("in process 1: ");
-            stdio.printInt(i);
-            stdio.print("\n");
+            const str = std.fmt.allocPrint(kernel_allocator, "in process 1: count: {}\n", .{i}) 
+                catch "backup string \n";
+            stdio.print(str);
+            kernel_allocator.free(str);            
         }
         process.switch_ctx();
     }
